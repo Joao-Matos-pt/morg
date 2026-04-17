@@ -3,10 +3,11 @@
 # ========================
 # CONFIG
 # ========================
-VERSION="0.67"
+VERSION="0.68"
 
-DIR="$HOME/.local/lib/morg"
-SCRIPTS="$DIR/scripts"
+LIB="/usr/local/lib/morg"
+DIR="$HOME/.local/share/morg"
+SCRIPTS="$LIB/scripts"
 TEMP="$DIR/temp"
 
 # ========================
@@ -28,6 +29,20 @@ check_duplicate() {
 
     echo "$hash|$file" >> "$TEMP/hashes.txt"
     return 0
+}
+
+match_from_filename() {
+    local norm_file
+    norm_file=$(norm "$1")
+
+    while IFS=: read -r artist norm_artist; do
+        [[ "$norm_file" == *"$norm_artist"* ]] && {
+            echo "$artist"
+            return 0
+        }
+    done < "$TEMP/album_artist.txt"
+
+    return 1
 }
 
 norm() {
@@ -86,20 +101,41 @@ step_organize() {
         | grep TAG:album_artist= \
         | cut -d'=' -f2)
 
+        artist=$(ffprobe -v quiet -show_format -show_streams "$f"\
+        | grep TAG:artist= \
+        | cut -d'=' -f2)
 
+        norm_artist=$(norm "$artist")
         norm_album_artist=$(norm "$album_artist")
+        norm_file_name=$(norm "$f")
 
-        if [[ -n "$album_artist" ]]; then
+        line1=$(awk -F: -v a="$norm_artist" '
+            $2 == a { print; exit }
+        ' "$TEMP/album_artist.txt")
 
+        if [[ -n "$album_artist" ]]; then #Album Artist exists
+            
+            #create map
             if ! grep -Fxq "$album_artist:$norm_album_artist" "$TEMP/album_artist.txt"; then
                 echo "$album_artist:$norm_album_artist" >> "$TEMP/album_artist.txt"
             fi
 
+            #Create directory and move file
             mkdir -p "$album_artist"
             mv "$f" "$album_artist/"
             echo "Moved: $f -> $album_artist"
 
-        else
+        elif [ -n "$line1" ]; then    #Album artist exists within artist name
+            album_artist=$(echo "$line1" | cut -d':' -f1)
+            mv "$f" "$album_artist/"
+            echo "Matched artist name: $f -> $album_artist"
+
+        elif matched=$(match_from_filename "$f"); then
+            mkdir -p "$matched"
+            mv "$f" "$matched/"
+            echo "Matched filename -> $matched"
+
+        else   #No hope, move to Others
             mkdir -p "Others"
             mv "$f" "Others/"
             echo "No album artist: $f"

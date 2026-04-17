@@ -2,63 +2,67 @@
 
 set -e
 
-echo "Installing MORG from git..."
-
 # ========================
-# DEPENDENCIES
+# CONFIG
 # ========================
 
-if ! command -v ffprobe >/dev/null 2>&1; then
-    echo "Installing ffmpeg..."
-    sudo apt update
-    sudo apt install -y ffmpeg
-fi
+BIN="/usr/local/bin"
+LIB="/usr/local/lib/morg"
+DATA="$HOME/.local/share/morg"
+
+echo "Installing MORG..."
 
 # ========================
-# PATHS
+# CHECK DEPENDENCIES
 # ========================
 
-BASE="$HOME/.local/lib/morg"
-BIN="$HOME/.local/bin"
-SCRIPTS="$BASE/scripts"
-TEMP="$BASE/temp"
+command -v ffprobe >/dev/null 2>&1 || {
+    echo "Error: ffprobe not found (install ffmpeg)"
+    exit 1
+}
+
+command -v sha256sum >/dev/null 2>&1 || {
+    echo "Error: sha256sum not found"
+    exit 1
+}
 
 # ========================
-# CREATE DIRS
+# CREATE DIRECTORIES
 # ========================
 
-mkdir -p "$SCRIPTS"
-mkdir -p "$TEMP"
-mkdir -p "$BIN"
+echo "Creating directories..."
+
+sudo mkdir -p "$LIB/scripts"
+mkdir -p "$DATA/temp"
 
 # ========================
-# COPY FROM REPO
+# COPY FILES
 # ========================
 
-cp ./main.sh "$BASE/main.sh"
-cp ./scripts/* "$SCRIPTS/"
+echo "Copying files..."
 
-chmod +x "$BASE/main.sh"
-chmod +x "$SCRIPTS/"*
+# main script
+sudo cp main.sh "$LIB/main.sh"
 
-# ========================
-# CREATE COMMAND
-# ========================
+# internal scripts
+sudo cp scripts/*.sh "$LIB/scripts/"
 
-cat > "$BIN/morg" << 'EOF'
-#!/bin/bash
-bash "$HOME/.local/lib/morg/main.sh" "$@"
-EOF
-
-chmod +x "$BIN/morg"
+# wrapper (morg command)
+sudo cp morg "$BIN/morg"
 
 # ========================
-# PATH CHECK
+# PERMISSIONS
 # ========================
 
-if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    echo "Add this to your shell config:"
-    echo 'export PATH="$HOME/.local/bin:$PATH"'
-fi
+echo "Setting permissions..."
 
-echo "MORG installed successfully!"
+sudo chmod +x "$LIB/main.sh"
+sudo chmod +x "$LIB/scripts/"*.sh
+sudo chmod +x "$BIN/morg"
+
+# ========================
+# DONE
+# ========================
+
+echo "Installation complete!"
+echo "Run with: morg"

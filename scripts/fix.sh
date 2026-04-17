@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DIR="$HOME/.local/lib/morg"
+DIR="$HOME/.local/share/morg"
 TEMP="$DIR/temp"
 FILE="$TEMP/album_artist.txt"
 
