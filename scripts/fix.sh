@@ -8,10 +8,10 @@ norm() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | xargs
 }
 
-if [[ ! -f "$FILE" ]]; then
+[[ ! -f "$FILE" ]] && {
     echo "Error: album_artist.txt not found"
     exit 1
-fi
+}
 
 echo "Fixing album_artist.txt..."
 
@@ -21,24 +21,21 @@ tmp_file="$TEMP/tmp.txt"
 declare -A seen
 
 while IFS= read -r line; do
-    [ -z "$line" ] && continue
+    [[ -z "$line" ]] && continue
 
-    # separar partes
-    original="${line%%:*}"
-    
-    # se já tem formato correto
     if [[ "$line" == *":"* ]]; then
+        original="${line%%:*}"
         normalized="${line#*:}"
     else
-        normalized=$(norm "$original")
+        original="$line"
+        normalized=$(norm "$line")
     fi
 
-    # garantir consistência
-    normalized=$(norm "$original")
+    # garantir consistência real
+    normalized=$(norm "$normalized")
 
     key="$original:$normalized"
 
-    # remover duplicados corretamente (em memória)
     if [[ -z "${seen[$key]}" ]]; then
         seen["$key"]=1
         echo "$key" >> "$tmp_file"
@@ -46,9 +43,6 @@ while IFS= read -r line; do
 
 done < "$FILE"
 
-# ordenar e substituir
-sort -u "$tmp_file" > "$FILE"
-
-rm "$tmp_file"
+mv "$tmp_file" "$FILE"
 
 echo "Fix complete."

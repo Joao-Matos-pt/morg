@@ -1,69 +1,141 @@
-# 🎧 MORG
+🎵 MORG — Music Organizer
 
-MORG is a Bash music organizer that automatically sorts your music library using metadata (ID3 tags).
+MORG is a CLI tool written in Bash that automatically organizes music files
+based on their metadata (ID3 tags).
 
----
+--------------------------------------------------
+🚀 Features
+--------------------------------------------------
 
-## 🚀 Features
+- Organizes music by:
+    • album_artist
+    • artist/album
 
-- Organizes music by **Album Artist**
-- Falls back to **Artist** if missing
-- Unknown artists go to `Others/`
-- Detects duplicates using SHA256 hashes
-- Includes `refresh` and `fix` tools
+- Smart fallback system:
+    • Uses artist if album_artist is missing
+    • Attempts to detect artist from filename
 
----
+- Duplicate detection using hashing (sha256)
+- Automatic reprocessing of "Others" folder
+- Name normalization (lowercase, trim)
+- Clean and consistent directory structure
 
-## 📂 Structure
+--------------------------------------------------
+📦 Structure
+--------------------------------------------------
 
+Default mode (album_artist):
+
+```text
 Music/
-  Artist/
-    Album/
-      song.mp3
+├── Juice WRLD/
+├── Travis Scott/
+└── Others/
+```
 
-Others/
+Artist mode:
 
----
+```text
+Music/
+└── Juice WRLD/
+    ├── Goodbye & Good Riddance/
+    └── Legends Never Die/
+```
+--------------------------------------------------
+⚙️ Installation
+--------------------------------------------------
 
-## ⚙️ Installation
+git clone https://github.com/Joao-Matos-pt/morg.git
 
-git clone https://github.com/YOUR_USERNAME/morg.git
 cd morg
+
+chmod +x install.sh
+
 ./install.sh
 
----
+--------------------------------------------------
+🧠 Dependencies
+--------------------------------------------------
 
-## 🎧 Usage
+- ffprobe (from ffmpeg)
+- sha256sum (coreutils)
 
-### Organize music
+Ubuntu:
+sudo apt install ffmpeg coreutils
 
+--------------------------------------------------
+🧪 Usage
+--------------------------------------------------
+
+Organize (default mode):
+```bash
+morg organize
+```
+
+Organize by artist:
+```bash
+morg organize --by artist
+```
+
+Organize specific directory:
+```bash
 morg organize Music
+```
 
-### Refresh library
+Refresh (reprocess "Others"):
+```bash
+morg refresh
+```
 
-morg refresh Music
+> Automatically uses the last selected mode
 
-### Fix internal data
-
+Fix internal files:
+```bash
 morg fix
+```
 
----
+--------------------------------------------------
+🧹 Uninstall
+--------------------------------------------------
 
-## 🧠 Requirements
+./uninstall.sh
 
-- ffmpeg (ffprobe)
-- coreutils (sha256sum)
+--------------------------------------------------
+🧠 How it works
+--------------------------------------------------
 
-Install on Ubuntu:
+1. Reads metadata using ffprobe
+2. Normalizes names (lowercase, trim)
+3. Moves files into structured directories
+4. Stores artist mapping
+5. Reprocesses problematic files (Others)
+6. Avoids duplicates using hashing
 
-sudo apt install ffmpeg
+--------------------------------------------------
+⚠️ Safety
+--------------------------------------------------
 
----
+- Prevents execution in unsafe directories (/, $HOME)
+- Sanitizes folder names
+- Confirms before deleting user data
 
-## ⚠️ Warning
+--------------------------------------------------
+📌 Status
+--------------------------------------------------
 
-Do not run on system directories like / or /home.
+Work in progress — continuous improvements
 
-Test first on a music folder.
+--------------------------------------------------
+💡 Future Ideas
+--------------------------------------------------
 
----
+- GUI interface
+- Config file (~/.config/morg)
+- Better duplicate detection (bitrate, quality)
+- Music API integration
+
+--------------------------------------------------
+👤 Author
+--------------------------------------------------
+
+Developed by João Matos

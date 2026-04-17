@@ -3,7 +3,7 @@
 # ========================
 # CONFIG
 # ========================
-VERSION="0.68"
+VERSION="0.69"
 
 LIB="/usr/local/lib/morg"
 DIR="$HOME/.local/share/morg"
@@ -45,6 +45,18 @@ match_from_filename() {
     return 1
 }
 
+get_mode() {
+    if [[ -f "$TEMP/mode" ]]; then
+        cat "$TEMP/mode"
+    else
+        echo "album_artist"
+    fi
+}
+
+set_mode() {
+    echo "$1" > "$TEMP/mode"
+}
+
 norm() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | xargs
 }
@@ -76,8 +88,10 @@ validate_safe_path() {
 
 step_prepare() {
     mkdir -p "$TEMP"
+    > "$TEMP/hashes.txt"
     touch "$TEMP/album_artist.txt"
     touch "$TEMP/hashes.txt"
+    touch "$TEMP/artist.txt"
     mkdir -p "$TEMP/duplicates"
 }
 
@@ -88,7 +102,7 @@ step_process_others() {
     fi
 }
 
-step_organize() {
+step_organize_album_artist() {
     cd "$DEST" || exit
 
     shopt -s nullglob
@@ -97,13 +111,11 @@ step_organize() {
 
         check_duplicate "$f" || continue
 
-        album_artist=$(ffprobe -v quiet -show_format -show_streams "$f"\
-        | grep TAG:album_artist= \
-        | cut -d'=' -f2)
+        metadata=$(ffprobe -v quiet -show_format -show_streams "$f")
 
-        artist=$(ffprobe -v quiet -show_format -show_streams "$f"\
-        | grep TAG:artist= \
-        | cut -d'=' -f2)
+        album_artist=$(echo "$metadata" | grep TAG:album_artist= | cut -d'=' -f2)
+
+        artist=$(echo "$metadata" | grep TAG:artist= | cut -d'=' -f2)
 
         norm_artist=$(norm "$artist")
         norm_album_artist=$(norm "$album_artist")
@@ -143,6 +155,49 @@ step_organize() {
     done
 }
 
+step_organize_artist() {
+
+    cd "$DEST" || exit
+    shopt -s nullglob
+
+    for f in *.mp3 *.opus *.flac *.m4a; do
+
+        metadata=$(ffprobe -v quiet -show_format -show_streams "$f")
+
+        artist=$(echo "$metadata" | grep TAG:artist= | cut -d'=' -f2)
+        album=$(echo "$metadata" | grep TAG:album= | cut -d'=' -f2)
+
+        norm_artist=$(norm "$artist")
+
+        if [[ -n "$artist" ]]; then
+
+            # guardar no mapa
+            if ! grep -Fxq "$artist:$norm_artist" "$TEMP/artist.txt"; then
+                echo "$artist:$norm_artist" >> "$TEMP/artist.txt"
+            fi
+
+            # sanitizar nomes (IMPORTANTE)
+            safe_artist=$(echo "$artist" | sed 's#[/:]#-#g')
+            safe_album=$(echo "$album" | sed 's#[/:]#-#g')
+
+            if [[ -n "$album" ]]; then
+                mkdir -p "$safe_artist/$safe_album"
+                mv "$f" "$safe_artist/$safe_album/"
+                echo "Moved: $f -> $safe_artist/$safe_album"
+            else
+                mkdir -p "$safe_artist"
+                mv "$f" "$safe_artist/"
+                echo "Moved: $f -> $safe_artist"
+            fi
+
+        else
+            mkdir -p "Others"
+            mv "$f" "Others/"
+            echo "No artist: $f"
+        fi
+    done
+}
+
 # ========================
 # COMMANDS
 # ========================
@@ -152,14 +207,47 @@ cmd_organize() {
     validate_safe_path
     step_prepare
     step_process_others
-    step_organize
+
+    MODE="${3:-album_artist}"
+
+    case "$MODE" in
+        artist)
+            set_mode "artist"
+            step_organize_artist
+            ;;
+        album_artist)
+            set_mode "album_artist"
+            step_organize_album_artist
+            ;;
+        *)
+            die "Invalid mode: use --by artist|album_artist"
+            ;;
+    esac
 }
 
+
 cmd_refresh() {
+    > "$TEMP/hashes.txt"
+
     resolve_dest "$2"
     validate_safe_path
     step_process_others
-    step_organize
+
+    MODE=$(get_mode)
+
+    echo "Using mode: $MODE"
+
+    case "$MODE" in
+        artist)
+            step_organize_artist
+            ;;
+        album_artist)
+            step_organize_album_artist
+            ;;
+        *)
+            die "Invalid saved mode"
+            ;;
+    esac
 }
 
 cmd_fix() {
@@ -171,12 +259,67 @@ cmd_fix() {
 # ========================
 
 main() {
-    case "$1" in
+    COMMAND="$1"
+    shift
+
+    DEST="."
+    MODE=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --by)
+                MODE="$2"
+                shift 2
+                ;;
+            *)
+                DEST="$1"
+                shift
+                ;;
+        esac
+    done
+
+    case "$COMMAND" in
         organize)
-            cmd_organize "$@"
+            resolve_dest "$DEST"
+            validate_safe_path
+            step_prepare
+            step_process_others
+
+            MODE="${MODE:-album_artist}"
+
+            case "$MODE" in
+                artist)
+                    set_mode "artist"
+                    step_organize_artist
+                    ;;
+                album_artist)
+                    set_mode "album_artist"
+                    step_organize_album_artist
+                    ;;
+                *)
+                    die "Invalid mode: artist | album_artist"
+                    ;;
+            esac
             ;;
         refresh)
-            cmd_refresh "$@"
+            resolve_dest "$DEST"
+            validate_safe_path
+            step_process_others
+
+            MODE=$(get_mode)
+            echo "Using mode: $MODE"
+
+            case "$MODE" in
+                artist)
+                    step_organize_artist
+                    ;;
+                album_artist)
+                    step_organize_album_artist
+                    ;;
+                *)
+                    die "Invalid saved mode"
+                    ;;
+            esac
             ;;
         fix)
             cmd_fix
@@ -185,7 +328,10 @@ main() {
             echo "morg version:$VERSION"
             ;;
         *)
-            echo "Usage: morg {organize|refresh|fix} [directory]"
+            echo "Usage:"
+            echo "  morg organize [dir] --by artist|album_artist"
+            echo "  morg refresh [dir]"
+            echo "  morg fix"
             exit 1
             ;;
     esac

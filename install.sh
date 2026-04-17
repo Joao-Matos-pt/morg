@@ -6,7 +6,7 @@ set -e
 # CONFIG
 # ========================
 
-BIN="/usr/local/bin"
+BIN="/usr/local/bin/morg"
 LIB="/usr/local/lib/morg"
 DATA="$HOME/.local/share/morg"
 
@@ -35,30 +35,31 @@ echo "Creating directories..."
 sudo mkdir -p "$LIB/scripts"
 mkdir -p "$DATA/temp"
 
+# inicial state
+echo "album_artist" > "$DATA/temp/mode"
+
 # ========================
 # COPY FILES
 # ========================
 
 echo "Copying files..."
 
-# main script
 sudo cp main.sh "$LIB/main.sh"
-
-# internal scripts
 sudo cp scripts/*.sh "$LIB/scripts/"
 
-# wrapper (morg command)
-sudo cp morg "$BIN/morg"
+# wrapper CLI
+sudo tee "$BIN" > /dev/null <<EOF
+#!/bin/bash
+exec /usr/local/lib/morg/main.sh "\$@"
+EOF
 
 # ========================
 # PERMISSIONS
 # ========================
 
-echo "Setting permissions..."
-
 sudo chmod +x "$LIB/main.sh"
 sudo chmod +x "$LIB/scripts/"*.sh
-sudo chmod +x "$BIN/morg"
+sudo chmod +x "$BIN"
 
 # ========================
 # DONE
